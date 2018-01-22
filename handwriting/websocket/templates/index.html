@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title></title>
+    <style>
+    	*{
+    		padding: 0;
+    		margin: 0;
+    	}
+    	.sl-canvas-wrapper canvas{
+    		border: 1px solid #000;
+    	}
+    	.sl-canvas-button button{
+    		width: 88px;
+    		box-sizing: border-box;
+    		float: left;
+    		height: 30px;
+    		border: none;
+    		color: #fff;
+    		background: #999;
+    	}
+    	.sl-canvas-button button + button{
+    		margin-left: 6px;
+    	}
+    	.sl-canvas-button:after{
+    		clear: both;
+    		content: '';
+    		display: block;
+    	}
+    </style>
+</head>
+<body>
+	<div class="sl-canvas-wrapper">
+		<canvas></canvas>
+		<div class="sl-canvas-button">
+			<button id="clear">清空</button>
+			<button id="confirm">确定</button>
+		</div>
+	</div>
+    <img id="image" />
+	<div id="possibility"></div>
+</body>
+<script type="text/javascript" src="https://cdn.bootcss.com/jquery/1.4.1/jquery.min.js"></script>
+<script type="text/javascript" src="https://cdn.bootcss.com/socket.io/1.3.5/socket.io.min.js"></script>
+<script>
+	var numberBoard = {
+		selector: 'canvas',
+		resultSelector: '#possibility',
+		context: undefined,
+		socket: undefined,
+		width: 180,
+		height: 180,
+		init: function(){
+			this.initCanvas();
+			this.initButton();
+			this.initWebsocket();
+		},
+		initCanvas: function(){
+			var canvas = document.querySelector(this.selector);
+			var $this = this;
+			canvas.width = this.width;
+			canvas.height = this.height;
+			
+			var isMouseDown = false;
+			canvas.onmouseup = function(){
+				isMouseDown = false;
+			}
+			canvas.onmousedown = function(){
+				isMouseDown = true;
+			}
+			var context = canvas.getContext("2d");
+			this.context = context;
+			canvas.onmousemove = function(e){
+				if(isMouseDown){
+					var point = {
+						x: e.offsetX,
+						y: e.offsetY
+					}
+					context.beginPath();
+					context.fillStyle = '#FFF';
+					context.arc(point.x, point.y, Math.ceil($this.width / 28), 0, 2*Math.PI);
+					context.fill();
+				}	
+			};
+			this.clearCanvas();
+		},
+		clearCanvas: function(){
+			this.context.clearRect(0, 0, this.width, this.height);
+			this.context.fillStyle = '#000';
+			this.context.fillRect(0, 0, this.width, this.height);
+		},
+		initButton: function(){
+			var $this = this;
+			document.querySelector("#clear").addEventListener("click",function(){
+				$this.clearCanvas();
+			});
+			document.querySelector("#confirm").addEventListener("click", function(){
+				$this.sendImage();
+			});
+		},
+		initWebsocket: function(){
+		  var $this = this;
+		  var namespace = '/handwriting';
+          var socket = io.connect(location.protocol + '//' + document.domain + ':' + location.port + namespace);
+          this.socket = socket;
+		  socket.on('connect', function() {
+			socket.emit('my_event', {data: 'I\'m connected!'});
+		  });
+		  socket.on('possibility', function(res){
+		  	$this.updatePossibility(res.data[0]);
+		  });
+		},
+		updatePossibility: function(possibility){
+			var resultPlaceholder = document.querySelector(this.resultSelector);
+			var resultList = [];
+			possibility.forEach(function(item, index){
+			  resultList.push("<div>数字" + index + " : " + item.toFixed(8));
+			});
+			resultPlaceholder.innerHTML = resultList.join();
+		},
+		sendImage: function(){
+		  var base64 = document.querySelector(this.selector).toDataURL('image/png');
+		  document.querySelector("#image").src = base64;
+		  this.socket.emit("image", { data: base64 });
+		}
+	}
+	
+	numberBoard.init();
+</script>
+
+</html>
